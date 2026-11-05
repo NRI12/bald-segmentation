@@ -5,8 +5,8 @@ import numpy as np
 
 HAIR, BALD = 1, 2
 CLASS_IDS = {"hair": HAIR, "bald": BALD}
-GRADES = ["Mức 0 - Không đáng kể", "Mức 1 - Nhẹ", "Mức 2 - Trung bình", "Mức 3 - Nặng"]
-NORWOOD_TO_GRADE = {2: 0, 3: 1, 4: 2, 5: 2, 6: 3, 7: 3}
+GRADES = ["Stage 1-2", "Stage 3", "Stage 4", "Stage 5", "Stage 6", "Stage 7"]
+NORWOOD_TO_GRADE = {2: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5}
 VIEWS = ["Front", "Top-Down", "Back", "Left", "Right"]
 
 
@@ -53,6 +53,26 @@ def bald_ratio(cmap):
 def grader_features(cmap, view):
     n = cmap.size
     return [bald_ratio(cmap), (cmap == BALD).sum() / n, (cmap == HAIR).sum() / n, *(float(v == view) for v in VIEWS)]
+
+
+def has_vertex(cmap, min_frac=0.01, ring=15, hair_frac=0.8):
+    h, w = cmap.shape
+    n, lab, stats, _ = cv2.connectedComponentsWithStats((cmap == BALD).astype(np.uint8))
+    kernel = np.ones((ring, ring), np.uint8)
+    for i in range(1, n):
+        x, y, bw, bh, area = stats[i]
+        if area < min_frac * cmap.size or x == 0 or y == 0 or x + bw >= w or y + bh >= h:
+            continue
+        comp = (lab == i).astype(np.uint8)
+        border = cv2.dilate(comp, kernel).astype(bool) & ~comp.astype(bool)
+        if (cmap[border] == HAIR).mean() >= hair_frac:
+            return True
+    return False
+
+
+def stage_label(level, cmap, view):
+    vertex = level == 1 and view == "Top-Down" and has_vertex(cmap)
+    return ("Stage 3 Vertex" if vertex else GRADES[level]), vertex
 
 
 def fit_thresholds(ratios, method="quantile", levels=len(GRADES)):

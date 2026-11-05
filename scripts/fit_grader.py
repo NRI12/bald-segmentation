@@ -10,7 +10,7 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.tree import DecisionTreeClassifier
 from ultralytics import YOLO
 
-from baldseg.core import GRADES, grade, grader_features, load_thresholds, result_classmap
+from baldseg.core import GRADES, NORWOOD_TO_GRADE, grader_features, result_classmap
 from baldseg.metrics import grade_report
 
 
@@ -30,7 +30,7 @@ def main():
     rows = list(csv.DictReader(open(args.grades / "labels.csv")))
     split = {s: [r for r in rows if r["split"] == s] for s in ("train", "valid", "test")}
     x = {s: features(model, args.grades, r, args.conf) for s, r in split.items()}
-    y = {s: np.array([int(r["grade"]) for r in rs]) for s, rs in split.items()}
+    y = {s: np.array([NORWOOD_TO_GRADE[int(r["norwood"])] for r in rs]) for s, rs in split.items()}
 
     def fit(depth):
         return DecisionTreeClassifier(max_depth=depth, class_weight="balanced", random_state=0).fit(x["train"], y["train"])
@@ -40,7 +40,6 @@ def main():
     tree = fit(depth)
     joblib.dump(tree, args.weights / "grader.joblib")
 
-    thresholds = load_thresholds(args.weights / "grades.json")
     test_views = np.array([r["view"] for r in split["test"]])
     pred = tree.predict(x["test"])
     report = {
@@ -48,7 +47,6 @@ def main():
         "valid_kappa_by_depth": scores,
         "tree": grade_report(y["test"], pred, len(GRADES)),
         "tree_by_view": {v: float((pred[test_views == v] == y["test"][test_views == v]).mean()) for v in sorted(set(test_views))},
-        "r_thresholds": grade_report(y["test"], [grade(r, thresholds) for r in x["test"][:, 0]], len(GRADES)),
     }
     args.out.mkdir(exist_ok=True)
     json.dump(report, open(args.out / "grading_a.json", "w"), indent=2, default=float)

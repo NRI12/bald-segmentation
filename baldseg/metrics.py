@@ -31,6 +31,8 @@ def grade_report(gt, pred, levels):
     p, r, f1, _ = precision_recall_fscore_support(gt, pred, labels=range(levels), average="macro", zero_division=0)
     return {
         "accuracy": accuracy_score(gt, pred),
+        "within_1": float(np.mean(np.abs(np.asarray(gt) - np.asarray(pred)) <= 1)),
+        "mae_stage": float(np.mean(np.abs(np.asarray(gt) - np.asarray(pred)))),
         "precision_macro": p,
         "recall_macro": r,
         "f1_macro": f1,

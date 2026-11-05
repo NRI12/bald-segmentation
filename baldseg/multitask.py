@@ -10,7 +10,7 @@ import yaml
 from torch.utils.data import Dataset
 from transformers import SegformerConfig, SegformerForSemanticSegmentation
 
-from baldseg.core import BALD, GRADES, HAIR, bald_ratio, label_classmap
+from baldseg.core import BALD, GRADES, HAIR, NORWOOD_TO_GRADE, bald_ratio, label_classmap
 
 IGNORE = 255
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
@@ -43,7 +43,8 @@ def save(model, path, size):
 def load(path, device):
     ckpt = torch.load(path, map_location=device)
     model = MultiTask(ckpt["backbone"], pretrained=False)
-    model.load_state_dict(ckpt["state"])
+    state = model.state_dict()
+    model.load_state_dict({k: v for k, v in ckpt["state"].items() if k in state and v.shape == state[k].shape}, strict=False)
     return model.to(device).eval(), ckpt["size"]
 
 
@@ -63,7 +64,7 @@ def grade_items(grade_dir, split, pseudo_dir=None):
     for r in csv.DictReader(open(Path(grade_dir) / "labels.csv")):
         if r["split"] == split:
             png = pseudo_dir and Path(pseudo_dir) / f"{Path(r['file']).stem}.png"
-            items.append({"image": Path(grade_dir) / r["file"], "mask": png if png and png.exists() else None, "grade": int(r["grade"]), "view": r["view"]})
+            items.append({"image": Path(grade_dir) / r["file"], "mask": png if png and png.exists() else None, "grade": NORWOOD_TO_GRADE[int(r["norwood"])], "view": r["view"]})
     return items
 
 
@@ -132,7 +133,9 @@ def total_loss(outputs, batch, grade_weight, lambdas=(1.0, 0.5, 0.2)):
     if has_r.any():
         loss = loss + lambdas[0] * F.smooth_l1_loss(ratio[has_r], ratio_gt[has_r], beta=0.05)
     if has_g.any():
-        loss = loss + lambdas[1] * F.cross_entropy(grade[has_g], grade_gt[has_g], weight=grade_weight)
+        g, y = grade[has_g].float(), grade_gt[has_g]
+        expected = (g.softmax(1) * torch.arange(g.shape[1], device=g.device)).sum(1)
+        loss = loss + lambdas[1] * (F.cross_entropy(g, y, weight=grade_weight) + 0.5 * F.smooth_l1_loss(expected, y.float()))
     return loss + lambdas[2] * F.smooth_l1_loss(ratio, soft_ratio(logits).detach(), beta=0.05)
 
 
