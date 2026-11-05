@@ -51,16 +51,20 @@ def plan_b(weights, mc):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--plan", choices=["a", "b"], default="a")
-    p.add_argument("--weights", type=Path, default=None)
+    p.add_argument("--weights-a", type=Path, default=Path("weights"))
+    p.add_argument("--weights-b", type=Path, default=Path("weights_b"))
     p.add_argument("--conf", type=float, default=0.25)
     p.add_argument("--mc", type=int, default=8)
     p.add_argument("--port", type=int, default=7860)
     args = p.parse_args()
-    run = plan_a(args.weights or Path("weights"), args.conf) if args.plan == "a" else plan_b(args.weights or Path("weights_b"), args.mc)
+    plans = {}
+    if (args.weights_b / "stage2.pt").exists():
+        plans["B - SegFormer đa nhiệm"] = plan_b(args.weights_b, args.mc)
+    if (args.weights_a / "best.pt").exists():
+        plans["A - YOLO11-seg"] = plan_a(args.weights_a, args.conf)
     gr.Interface(
-        run,
-        [gr.Image(type="numpy", label="Ảnh đầu"), gr.Dropdown(VIEWS, value="Top-Down", label="Góc chụp")],
-        [gr.Image(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)"), gr.Image(label="Bản đồ bất định"), gr.Textbox(label="Tỷ lệ rụng tóc R"), gr.Textbox(label="Mức độ")],
+        lambda rgb, view, plan: plans[plan](rgb, view),
+        [gr.Image(type="numpy", label="Ảnh đầu"), gr.Dropdown(VIEWS, value="Top-Down", label="Góc chụp"), gr.Radio(list(plans), value=next(iter(plans)), label="Mô hình")],
+        [gr.Image(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)"), gr.Image(label="Bản đồ bất định (Phương án B)"), gr.Textbox(label="Tỷ lệ rụng tóc R"), gr.Textbox(label="Mức độ")],
         title="Đánh giá mức độ rụng tóc",
     ).launch(server_name="0.0.0.0", server_port=args.port)
