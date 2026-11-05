@@ -69,6 +69,15 @@ Ngưỡng R (phân vị train): 0.017 / 0.087 / 0.358. Mask mAP50 (valid) 0.743.
 
 Phân đoạn và độ ổn định test–retest đạt yêu cầu baseline. Phân mức còn yếu ở mức 1–2: các ngưỡng thấp rất sát nhau nên vùng hói nhỏ bị bỏ sót sẽ đẩy ảnh về mức 0. Mức 3 nhận đúng 8/12 (test) và 18/21 (valid).
 
+## Phân mức Phương án A theo nhãn Norwood (test 190 ảnh, 4 mức)
+
+| Cách phân mức | Accuracy | F1 macro | Kappa (quadratic) |
+|---|---|---|---|
+| Ngưỡng R phân vị (cũ) | 0.395 | 0.264 | 0.311 |
+| Cây quyết định độ sâu 4 trên {R, diện tích hói, diện tích tóc, góc chụp} | 0.384 | 0.364 | 0.486 |
+
+Accuracy của cây theo góc chụp: Top-Down 0.63, Front 0.53, Back 0.32, Right 0.27, Left 0.18. Cây cải thiện rõ kappa và F1 (không còn dồn về một mức), nhưng ảnh nghiêng/sau đầu khác phân phối với tập phân đoạn nên R kém tin cậy ở các góc này. Lần chạy lại này: Dice bald test 0.742, valid 0.809.
+
 ## Ghi chú phương pháp
 
 - Dataset: Roboflow `fifa-eg5yw/hairloss-segmentation-lf62l` version 1, 461 ảnh gốc, lớp `bald`, `hair`, resize 640×640, không augment sẵn. Augment xoay/lật thực hiện lúc train nên không rò rỉ giữa các split.
