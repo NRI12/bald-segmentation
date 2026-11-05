@@ -1,16 +1,23 @@
 # Bald segmentation
 
-Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_bald / (S_bald + S_hair)` và phân 4 mức độ. Triển khai Phương án A trong `report.md`: YOLO11-seg fine-tune + ngưỡng hóa R.
+Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_bald / (S_bald + S_hair)` và phân 4 mức độ. Triển khai theo `report.md`: Phương án A (YOLO11-seg + phân mức bằng cây quyết định) và Phương án B (SegFormer-B2 đa nhiệm, bán giám sát, MC Dropout).
 
 ## Cấu trúc
 
 | Tệp | Chức năng |
 |---|---|
 | `baldseg/core.py` | CLAHE, chuyển polygon / kết quả YOLO thành class map, tính R, ngưỡng phân mức |
+| `baldseg/data.py` | Tải Roboflow, dHash dedupe, chia split theo nhóm |
+| `baldseg/multitask.py` | Phương án B: mô hình SegFormer 3 đầu ra, dataset, loss, MC Dropout + TTA, hậu xử lý morphology |
 | `baldseg/metrics.py` | Dice, IoU, Precision, Recall theo lớp; Accuracy, P/R/F1 macro, kappa, confusion matrix; MAE, Spearman, ICC |
 | `scripts/prepare_data.py` | Tải dataset Roboflow, loại ảnh trùng (dHash), chia lại 80/10/10 theo `source_id`, áp CLAHE |
 | `scripts/train.py` | Fine-tune YOLO11-seg, lưu `weights/best.pt` và ngưỡng mức `weights/grades.json` |
-| `scripts/evaluate.py` | Đánh giá trên tập test/valid, lưu `results/metrics_<split>.json` |
+| `scripts/evaluate.py` | Đánh giá Phương án A trên tập test/valid, lưu `results/metrics_<split>.json` |
+| `scripts/prepare_grades.py` | Tải `uze/hair-loss-nq8hh` (nhãn Norwood 2–7), chia theo người, ánh xạ 4 mức |
+| `scripts/fit_grader.py` | Phương án A: cây quyết định trên {R, diện tích hói, diện tích tóc, góc chụp}, chọn độ sâu theo kappa valid |
+| `scripts/train_b.py` | Phương án B: huấn luyện đa nhiệm (seg + R + mức) |
+| `scripts/pseudo_label.py` | Sinh pseudo-mask cho ảnh Norwood theo ngưỡng độ tin cậy |
+| `scripts/evaluate_b.py` | Đánh giá Phương án B: phân đoạn, R, bất định, phân mức theo nhãn Norwood |
 | `scripts/vast_launch.sh` | Đóng gói mã nguồn vào onstart và tạo instance Vast.ai |
 | `scripts/vast_onstart.sh` | Pipeline chạy trên instance: chuẩn bị dữ liệu, train, đánh giá |
 | `app.py` | Demo Gradio: ảnh → overlay mask, R, mức độ |
@@ -28,7 +35,19 @@ export ROBOFLOW_API_KEY=<key>
 python -m scripts.prepare_data
 python -m scripts.train --model yolo11m-seg.pt --epochs 200
 python -m scripts.evaluate --split test
-python app.py --weights weights
+python -m scripts.prepare_grades
+python -m scripts.fit_grader
+python app.py --plan a
+```
+
+Phương án B:
+
+```bash
+python -m scripts.train_b --epochs 40 --out weights_b/stage1.pt
+python -m scripts.pseudo_label
+python -m scripts.train_b --init weights_b/stage1.pt --pseudo data_grade/pseudo --epochs 20 --lr 3e-5 --out weights_b/stage2.pt
+python -m scripts.evaluate_b
+python app.py --plan b
 ```
 
 ## Huấn luyện trên Vast.ai
@@ -39,7 +58,7 @@ vastai logs <INSTANCE_ID> --tail 100
 vastai copy <INSTANCE_ID>:/workspace/result.tgz ./
 ```
 
-## Kết quả (YOLO11m-seg, 200 epoch, RTX 3060)
+## Kết quả Phương án A ban đầu (YOLO11m-seg, 200 epoch, RTX 3060, mức suy từ R)
 
 | Split | Dice bald | IoU bald | Dice hair | Dice TB | MAE R | Spearman R–mức | ICC | Acc mức | F1 macro | Kappa (quadratic) |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -56,3 +75,6 @@ Phân đoạn và độ ổn định test–retest đạt yêu cầu baseline. P
 - Mask lớp: chồng `bald` lên `hair` (nhãn); với dự đoán, instance có độ tin cậy cao hơn ghi đè.
 - Mức độ: không có nhãn mức, nên mức tham chiếu suy từ R của nhãn gốc; ngưỡng là các phân vị 25/50/75 của R trên tập train (`--grade-method kmeans` cho phân cụm 1D).
 - F1 pixel trùng Dice. ICC test–retest đo trên ảnh gốc và ảnh lật ngang + đổi sáng.
+- Nhãn mức thật lấy từ `uze/hair-loss-nq8hh` (CC BY 4.0, 5 góc chụp/người): Norwood 2 → 0, 3 → 1, 4–5 → 2, 6–7 → 3. Chia split theo người để không rò rỉ.
+- Phương án B: loss `L = L_seg (CE có trọng số biên + Dice) + 1.0·SmoothL1(R) + 0.5·CE(mức, trọng số lớp) + 0.2·nhất quán(R head, R mềm từ mask)`. Vòng 1 học trên mask thật + nhãn mức; vòng 2 thêm pseudo-mask (pixel conf ≥ 0.9, ảnh giữ lại nếu ≥ 60% pixel đủ tin cậy). Bất định: 8 lượt MC Dropout × lật ngang, entropy chuẩn hóa.
+- Chưa làm: pretrain trên CelebAMask-HQ / Figaro-1k và CRF (thay bằng morphology + lọc thành phần liên thông nhỏ).

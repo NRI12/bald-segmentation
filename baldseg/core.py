@@ -6,6 +6,8 @@ import numpy as np
 HAIR, BALD = 1, 2
 CLASS_IDS = {"hair": HAIR, "bald": BALD}
 GRADES = ["Mức 0 - Không đáng kể", "Mức 1 - Nhẹ", "Mức 2 - Trung bình", "Mức 3 - Nặng"]
+NORWOOD_TO_GRADE = {2: 0, 3: 1, 4: 2, 5: 2, 6: 3, 7: 3}
+VIEWS = ["Front", "Top-Down", "Back", "Left", "Right"]
 
 
 def clahe(img):
@@ -46,6 +48,11 @@ def predict(model, img, conf=0.25):
 def bald_ratio(cmap):
     bald, hair = (cmap == BALD).sum(), (cmap == HAIR).sum()
     return float(bald / (bald + hair)) if bald + hair else 0.0
+
+
+def grader_features(cmap, view):
+    n = cmap.size
+    return [bald_ratio(cmap), (cmap == BALD).sum() / n, (cmap == HAIR).sum() / n, *(float(v == view) for v in VIEWS)]
 
 
 def fit_thresholds(ratios, method="quantile", levels=len(GRADES)):
