@@ -78,6 +78,38 @@ Phân đoạn và độ ổn định test–retest đạt yêu cầu baseline. P
 
 Accuracy của cây theo góc chụp: Top-Down 0.63, Front 0.53, Back 0.32, Right 0.27, Left 0.18. Cây cải thiện rõ kappa và F1 (không còn dồn về một mức), nhưng ảnh nghiêng/sau đầu khác phân phối với tập phân đoạn nên R kém tin cậy ở các góc này. Lần chạy lại này: Dice bald test 0.742, valid 0.809.
 
+## So sánh Phương án A và B (test)
+
+Phân đoạn trên 46 ảnh test của tập phân đoạn; phân mức trên 190 ảnh test có nhãn Norwood.
+
+| Độ đo | A: YOLO11m-seg + cây | B: SegFormer-B2 đa nhiệm |
+|---|---|---|
+| Dice bald | 0.742 | **0.812** |
+| IoU bald | 0.590 | **0.684** |
+| Dice hair | 0.878 | **0.902** |
+| Dice trung bình | 0.810 | **0.857** |
+| MAE của R | 0.111 | **0.067** (mask), 0.083 (head) |
+| ICC test–retest | 0.999 | 1.000 |
+| Accuracy mức (Norwood) | 0.384 | **0.547** |
+| F1 macro mức | 0.364 | **0.502** |
+| Kappa (quadratic) mức | 0.486 | **0.711** |
+| Spearman bất định – lỗi pixel | – | 0.894 |
+
+Valid của B: Dice bald 0.875, Dice TB 0.883, Accuracy mức 0.596, kappa 0.626.
+
+Accuracy mức của B theo góc chụp (test): Top-Down 0.68, Left 0.56, Front 0.56, Back 0.47, Right 0.46. So với A, B cải thiện mạnh ở ảnh nghiêng và sau đầu nhờ đầu phân mức học trực tiếp từ nhãn Norwood.
+
+Ma trận nhầm lẫn mức của B (test, hàng = thật):
+
+```
+[[15  6  0  0]
+ [15 12 16  0]
+ [ 5  6 20  9]
+ [ 2  5 22 57]]
+```
+
+Lỗi chủ yếu nằm giữa hai mức liền kề (đúng tính thứ bậc, kappa 0.71). Bản đồ bất định tương quan mạnh với lỗi phân đoạn (Spearman 0.89), dùng được để cảnh báo ca khó. Pseudo-label: giữ 844/908 ảnh Norwood ở vòng 2.
+
 ## Ghi chú phương pháp
 
 - Dataset: Roboflow `fifa-eg5yw/hairloss-segmentation-lf62l` version 1, 461 ảnh gốc, lớp `bald`, `hair`, resize 640×640, không augment sẵn. Augment xoay/lật thực hiện lúc train nên không rò rỉ giữa các split.
