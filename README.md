@@ -20,7 +20,9 @@ Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_ba
 | `scripts/evaluate_b.py` | Đánh giá Phương án B: phân đoạn, R, bất định, phân mức theo nhãn Norwood |
 | `scripts/vast_launch.sh` | Đóng gói mã nguồn vào onstart và tạo instance Vast.ai |
 | `scripts/vast_onstart.sh` | Pipeline chạy trên instance: chuẩn bị dữ liệu, train, đánh giá |
-| `app.py` | Demo Gradio: ảnh → overlay mask, R, mức độ |
+| `app.py` | Demo Gradio: chọn mô hình A/B, ảnh → overlay mask, R, mức độ, bản đồ bất định |
+| `examples/` | Ảnh mẫu từ tập test: `seg*` (hairloss-segmentation, MIT), `norwood*` (uze/hair-loss-nq8hh, CC BY 4.0) |
+| `scripts/vast_demo.sh` | Chạy demo trên Vast + Cloudflare quick tunnel |
 
 ## Cài đặt
 

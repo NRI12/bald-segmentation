@@ -56,6 +56,7 @@ if __name__ == "__main__":
     p.add_argument("--conf", type=float, default=0.25)
     p.add_argument("--mc", type=int, default=8)
     p.add_argument("--port", type=int, default=7860)
+    p.add_argument("--examples", type=Path, default=Path("examples"))
     args = p.parse_args()
     plans = {}
     if (args.weights_b / "stage2.pt").exists():
@@ -66,5 +67,6 @@ if __name__ == "__main__":
         lambda rgb, view, plan: plans[plan](rgb, view),
         [gr.Image(type="numpy", label="Ảnh đầu"), gr.Dropdown(VIEWS, value="Top-Down", label="Góc chụp"), gr.Radio(list(plans), value=next(iter(plans)), label="Mô hình")],
         [gr.Image(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)"), gr.Image(label="Bản đồ bất định (Phương án B)"), gr.Textbox(label="Tỷ lệ rụng tóc R"), gr.Textbox(label="Mức độ")],
+        examples=[[str(f), f.stem.split("_")[-1], next(iter(plans))] for f in sorted(args.examples.glob("*.jpg"))],
         title="Đánh giá mức độ rụng tóc",
     ).launch(server_name="0.0.0.0", server_port=args.port)
