@@ -2,7 +2,8 @@ set -ex
 apt-get update && apt-get install -y libgl1 libglib2.0-0 curl
 cd /workspace/bald-segmentation
 pip install --retries 10 --timeout 60 -r requirements.txt
-until [ -f /workspace/copy.done ]; do sleep 10; done
+until [ -f /workspace/src/bald-segmentation/weights_b/stage2.pt ]; do sleep 10; done
+while a=$(du -s /workspace/src); sleep 60; [ "$a" != "$(du -s /workspace/src)" ]; do :; done
 cp -rn /workspace/src/bald-segmentation/. /workspace/bald-segmentation/
 if [ ! -f results/norwood/metrics_b_valid.json ]; then
   python -m scripts.fit_grader
