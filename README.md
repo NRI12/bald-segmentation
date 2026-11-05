@@ -39,6 +39,17 @@ vastai logs <INSTANCE_ID> --tail 100
 vastai copy <INSTANCE_ID>:/workspace/result.tgz ./
 ```
 
+## Kết quả (YOLO11m-seg, 200 epoch, RTX 3060)
+
+| Split | Dice bald | IoU bald | Dice hair | Dice TB | MAE R | Spearman R–mức | ICC | Acc mức | F1 macro | Kappa (quadratic) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| valid (46) | 0.815 | 0.687 | 0.855 | 0.835 | 0.103 | 0.70 | 0.996 | 0.52 | 0.37 | 0.59 |
+| test (46) | 0.717 | 0.559 | 0.878 | 0.798 | 0.116 | 0.42 | 0.996 | 0.50 | 0.42 | 0.40 |
+
+Ngưỡng R (phân vị train): 0.017 / 0.087 / 0.358. Mask mAP50 (valid) 0.743.
+
+Phân đoạn và độ ổn định test–retest đạt yêu cầu baseline. Phân mức còn yếu ở mức 1–2: các ngưỡng thấp rất sát nhau nên vùng hói nhỏ bị bỏ sót sẽ đẩy ảnh về mức 0. Mức 3 nhận đúng 8/12 (test) và 18/21 (valid).
+
 ## Ghi chú phương pháp
 
 - Dataset: Roboflow `fifa-eg5yw/hairloss-segmentation-lf62l` version 1, 461 ảnh gốc, lớp `bald`, `hair`, resize 640×640, không augment sẵn. Augment xoay/lật thực hiện lúc train nên không rò rỉ giữa các split.
