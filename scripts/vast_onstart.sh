@@ -4,7 +4,7 @@ run() { [ -e "$1" ] || { "${@:2}" && touch "$1"; }; }
 apt-get update && apt-get install -y libgl1 libglib2.0-0
 cd /workspace/bald-segmentation
 mkdir -p .done
-pip install -r requirements.txt
+pip install --retries 10 --timeout 60 -r requirements.txt
 run data/data.yaml python -m scripts.prepare_data
 run data_grade/labels.csv python -m scripts.prepare_grades
 run weights/best.pt python -m scripts.train ${TRAIN_ARGS}

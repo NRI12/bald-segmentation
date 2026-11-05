@@ -1,7 +1,7 @@
 set -ex
 apt-get update && apt-get install -y libgl1 libglib2.0-0 curl
 cd /workspace/bald-segmentation
-pip install -r requirements.txt
+pip install --retries 10 --timeout 60 -r requirements.txt
 until [ -f /workspace/result.tgz ]; do sleep 10; done
 tar xzf /workspace/result.tgz
 [ -d examples ] || python -m scripts.fetch_examples
