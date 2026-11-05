@@ -11,7 +11,8 @@ Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_ba
 | `scripts/prepare_data.py` | Tải dataset Roboflow, loại ảnh trùng (dHash), chia lại 80/10/10 theo `source_id`, áp CLAHE |
 | `scripts/train.py` | Fine-tune YOLO11-seg, lưu `weights/best.pt` và ngưỡng mức `weights/grades.json` |
 | `scripts/evaluate.py` | Đánh giá trên tập test/valid, lưu `results/metrics_<split>.json` |
-| `scripts/vast_onstart.sh` | Script chạy toàn bộ pipeline trên instance Vast.ai |
+| `scripts/vast_launch.sh` | Đóng gói mã nguồn vào onstart và tạo instance Vast.ai |
+| `scripts/vast_onstart.sh` | Pipeline chạy trên instance: chuẩn bị dữ liệu, train, đánh giá |
 | `app.py` | Demo Gradio: ảnh → overlay mask, R, mức độ |
 
 ## Cài đặt
@@ -33,8 +34,7 @@ python app.py --weights weights
 ## Huấn luyện trên Vast.ai
 
 ```bash
-vastai create instance <OFFER_ID> --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime --disk 30 --ssh \
-  --env "-e ROBOFLOW_API_KEY=<key> -e BRANCH=main" --onstart scripts/vast_onstart.sh
+ROBOFLOW_API_KEY=<key> scripts/vast_launch.sh <OFFER_ID>
 vastai logs <INSTANCE_ID> --tail 100
 vastai copy <INSTANCE_ID>:/workspace/result.tgz ./
 ```

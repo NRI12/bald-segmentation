@@ -1,9 +1,6 @@
-#!/bin/bash
 set -ex
-apt-get update && apt-get install -y git libgl1 libglib2.0-0
-cd /workspace
-git clone -b "${BRANCH:-main}" https://github.com/NRI12/bald-segmentation.git
-cd bald-segmentation
+apt-get update && apt-get install -y libgl1 libglib2.0-0
+cd /workspace/bald-segmentation
 pip install -r requirements.txt
 python -m scripts.prepare_data
 python -m scripts.train ${TRAIN_ARGS}
