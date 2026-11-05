@@ -6,5 +6,5 @@ until [ -f /workspace/result.tgz ]; do sleep 10; done
 tar xzf /workspace/result.tgz
 curl -sL -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
 chmod +x /usr/local/bin/cloudflared
-nohup python app.py > /workspace/app.log 2>&1 &
-cloudflared tunnel --no-autoupdate --url http://localhost:7860
+python app.py 2>&1 &
+cloudflared tunnel --no-autoupdate --url http://127.0.0.1:7860
