@@ -56,6 +56,8 @@ python app.py --plan b
 
 ```bash
 ROBOFLOW_API_KEY=<key> scripts/vast_launch.sh <OFFER_ID>
+ROBOFLOW_API_KEY=<key> ONSTART=scripts/vast_demo.sh BUNDLE="app.py baldseg scripts/fetch_examples.py requirements.txt" scripts/vast_launch.sh <OFFER_ID>
+vastai copy <TRAIN_ID>:/workspace/result.tgz <DEMO_ID>:/workspace/
 vastai logs <INSTANCE_ID> --tail 100
 vastai copy <INSTANCE_ID>:/workspace/result.tgz ./
 ```
