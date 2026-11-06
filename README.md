@@ -19,10 +19,13 @@ Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_ba
 | `scripts/pseudo_label.py` | Sinh pseudo-mask cho ảnh Norwood theo ngưỡng độ tin cậy |
 | `scripts/evaluate_b.py` | Đánh giá Phương án B: phân đoạn, R, bất định, phân mức theo nhãn Norwood |
 | `scripts/vast_launch.sh` | Đóng gói mã nguồn vào onstart và tạo instance Vast.ai |
+| `scripts/cv_grades.py` | Đánh giá chéo 5-fold theo người, liệt kê nhãn nghi sai |
+| `scripts/review_suspects.py` | Ảnh ghép 5 góc cho từng người nghi sai nhãn + CSV để sửa nhãn |
+| `scripts/vast_cv.sh` | Chạy đánh giá chéo trên Vast |
 | `scripts/vast_norwood.sh` | Fine-tune 6 stage Norwood trên Vast rồi chạy demo |
 | `baldseg/norwood_art.py` | Vẽ hình minh họa từng stage (nhìn từ đỉnh đầu) |
 | `scripts/vast_onstart.sh` | Pipeline chạy trên instance: chuẩn bị dữ liệu, train, đánh giá |
-| `app.py` | Demo Gradio: chọn mô hình A/B, ảnh → overlay mask, R, mức độ, bản đồ bất định |
+| `app.py` | Demo Gradio: 1–5 ảnh/người theo góc chụp, gộp xác suất → stage Norwood, minh họa, mask, bản đồ bất định |
 | `examples/` | Ảnh mẫu từ tập test: `seg*` (hairloss-segmentation, MIT), `norwood*` (uze/hair-loss-nq8hh, CC BY 4.0) |
 | `scripts/vast_demo.sh` | Chạy demo trên Vast + Cloudflare quick tunnel |
 
@@ -129,6 +132,19 @@ Lỗi chủ yếu nằm giữa hai mức liền kề (đúng tính thứ bậc, 
 | Kappa (quadratic) | 0.568 | **0.784** |
 
 Valid của B: accuracy 0.346, ±1 stage 0.883, kappa 0.745. Phân đoạn của B sau fine-tune giữ nguyên: Dice bald test 0.815, valid 0.877; MAE của R 0.066.
+
+## Đánh giá chéo 5-fold theo người (Phương án B)
+
+Tập test cũ chỉ có 20 người nên số đo dao động mạnh. `scripts/cv_grades.py` chia 133 người (1.286 ảnh) thành 5 fold phân tầng theo stage, mỗi fold train lại từ đầu (SegFormer-B2, 384 px, 12 epoch, không pseudo-label) và dự đoán trên người chưa thấy. Mức người = trung bình xác suất các góc chụp.
+
+| | Đúng stage | ±1 stage | MAE (stage) | F1 macro | Kappa |
+|---|---|---|---|---|---|
+| Theo ảnh (1.286) | 0.409 | 0.844 | 0.78 | 0.423 | 0.773 |
+| Theo người (133) | 0.414 | 0.880 | 0.74 | 0.430 | 0.789 |
+
+Accuracy theo góc (ảnh): Top-Down 0.48, Front 0.41, Left 0.41, Right 0.39, Back 0.36. Accuracy từng fold: 0.39 / 0.43 / 0.41 / 0.37 / 0.46.
+
+Kết luận: mô hình xếp đúng thứ bậc (kappa ~0.79, 88% người lệch tối đa 1 stage) nhưng đúng chính xác stage chỉ ~41%; ranh giới giữa các stage liền kề là chỗ khó nhất. 46 người có dự đoán lệch nhãn ≥2 stage hoặc lệch với độ tin cậy ≥60% được liệt kê để rà soát nhãn: `python -m scripts.review_suspects` tạo ảnh ghép 5 góc và `results/cv/suspects/suspects.csv` (cột `corrected_norwood` để điền nhãn đã sửa). Rà soát nhanh cho thấy danh sách gồm cả lỗi mô hình (ví dụ tóc rất ngắn, da sẫm bị đoán quá nặng) lẫn nhãn có thể sai hoặc nằm ở ranh giới.
 
 ## Ghi chú phương pháp
 
