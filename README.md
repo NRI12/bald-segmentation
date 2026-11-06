@@ -23,6 +23,8 @@ Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_ba
 | `scripts/review_suspects.py` | Ảnh ghép 5 góc cho từng người nghi sai nhãn + CSV để sửa nhãn |
 | `scripts/vast_cv.sh` | Chạy đánh giá chéo trên Vast |
 | `scripts/vast_norwood.sh` | Fine-tune 6 stage Norwood trên Vast rồi chạy demo |
+| `baldseg/face.py` | Face-parsing để loại mặt, tai, cổ khỏi mask tóc/hói |
+| `scripts/vast_face.sh` | Fit lại cây A với mask đã lọc mặt, đánh giá, chạy demo |
 | `baldseg/norwood_art.py` | Vẽ hình minh họa từng stage (nhìn từ đỉnh đầu) |
 | `scripts/vast_onstart.sh` | Pipeline chạy trên instance: chuẩn bị dữ liệu, train, đánh giá |
 | `app.py` | Demo Gradio: 1–5 ảnh/người theo góc chụp, gộp xác suất → stage Norwood, minh họa, mask, bản đồ bất định |
@@ -145,6 +147,24 @@ Tập test cũ chỉ có 20 người nên số đo dao động mạnh. `scripts/
 Accuracy theo góc (ảnh): Top-Down 0.48, Front 0.41, Left 0.41, Right 0.39, Back 0.36. Accuracy từng fold: 0.39 / 0.43 / 0.41 / 0.37 / 0.46.
 
 Kết luận: mô hình xếp đúng thứ bậc (kappa ~0.79, 88% người lệch tối đa 1 stage) nhưng đúng chính xác stage chỉ ~41%; ranh giới giữa các stage liền kề là chỗ khó nhất. 46 người có dự đoán lệch nhãn ≥2 stage hoặc lệch với độ tin cậy ≥60% được liệt kê để rà soát nhãn: `python -m scripts.review_suspects` tạo ảnh ghép 5 góc và `results/cv/suspects/suspects.csv` (cột `corrected_norwood` để điền nhãn đã sửa). Rà soát nhanh cho thấy danh sách gồm cả lỗi mô hình (ví dụ tóc rất ngắn, da sẫm bị đoán quá nặng) lẫn nhãn có thể sai hoặc nằm ở ranh giới.
+
+## Loại vùng mặt, tai, cổ khỏi mask
+
+Tập phân đoạn chỉ có 2 lớp `hair`/`bald` và gần như không có ảnh nghiêng, nên mọi vùng da (má, tai, cổ) đều bị dự đoán là `bald`, làm R bị thổi phồng ở ảnh Front/Left/Right. `baldseg/face.py` dùng mô hình face-parsing có sẵn (`jonathandinu/face-parsing`, SegFormer trên CelebAMask-HQ) làm hậu xử lý, không cần train lại:
+
+- luôn loại: mắt, lông mày, kính, mũi, miệng, môi, tai, cổ, áo;
+- loại thêm vùng da/râu phía dưới đường lông mày (hướng "xuống" = lông mày → mũi/miệng/cổ, nên không phụ thuộc chiều xoay ảnh), giới hạn trong bao lồi của các bộ phận mặt; trán và da đầu được giữ lại;
+- không dùng thẳng lớp `skin` của face-parsing vì mô hình này gán cả da đầu hói là `skin`.
+
+Ảnh hưởng (test):
+
+| | Không lọc mặt | Có lọc mặt |
+|---|---|---|
+| A: Dice bald (phân đoạn, 46 ảnh) | 0.742 | 0.745 |
+| B: Dice bald / MAE R (46 ảnh) | 0.815 / 0.066 | 0.817 / 0.066 |
+| A: cây 6 stage, accuracy / ±1 / kappa (190 ảnh) | 0.289 / 0.668 / 0.568 | 0.247 / 0.742 / 0.622 |
+
+Ảnh test của tập phân đoạn chủ yếu là đỉnh đầu nên Dice gần như không đổi; tác dụng chính là R ở ảnh mặt/nghiêng không còn bị tính cả khuôn mặt. Đầu phân mức của B không dùng mask nên stage của B không đổi. Hạn chế: ở ảnh sau đầu, phần gáy/cổ sát chân tóc đôi khi vẫn bị tính là `bald` vì face-parsing không nhận ra cổ từ phía sau.
 
 ## Ghi chú phương pháp
 
