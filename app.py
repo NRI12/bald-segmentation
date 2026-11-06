@@ -84,6 +84,7 @@ if __name__ == "__main__":
     p.add_argument("--mc", type=int, default=8)
     p.add_argument("--port", type=int, default=7860)
     p.add_argument("--examples", type=Path, default=Path("examples"))
+    p.add_argument("--share", action="store_true")
     args = p.parse_args()
     import torch
     masker = FaceMasker(device="cuda" if torch.cuda.is_available() else "cpu")
@@ -110,4 +111,4 @@ if __name__ == "__main__":
         rows, labels = examples(args.examples, plan.value)
         gr.Examples(rows, images + [plan], example_labels=labels, label="Ảnh mẫu từ tập test (mỗi dòng là một người)")
         button.click(lambda pl, *imgs: assess(plans, pl, imgs), [plan] + images, [seg, unc, stage, per_view, art])
-    demo.launch(server_name="0.0.0.0", server_port=args.port)
+    demo.launch(server_name="0.0.0.0", server_port=args.port, share=args.share)

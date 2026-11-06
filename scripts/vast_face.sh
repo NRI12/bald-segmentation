@@ -15,7 +15,4 @@ if [ ! -f results/face/done ]; then
 fi
 echo FACE_DONE
 until [ -d /workspace/src/examples ]; do sleep 10; done; sleep 30; cp -rn /workspace/src/examples .
-curl -sL -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-chmod +x /usr/local/bin/cloudflared
-python app.py 2>&1 &
-cloudflared tunnel --no-autoupdate --url http://127.0.0.1:7860
+python app.py --share 2>&1
