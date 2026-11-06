@@ -6,3 +6,6 @@ weights/*.pt
 *.zip
 __pycache__/
 .env
+data_grade/
+raw_grade/
+raw_examples/
