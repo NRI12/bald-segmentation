@@ -31,7 +31,7 @@ def plan_a(weights, conf, masker):
 
     def run(rgb, view):
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        cmap = remove_face(predict(model, bgr, conf), masker(clahe(bgr)))
+        cmap = remove_face(predict(model, bgr, conf), masker(clahe(bgr), view))
         probs = np.zeros(len(GRADES))
         probs[tree.classes_] = tree.predict_proba([grader_features(cmap, view)])[0]
         return cmap, probs, None, f"{bald_ratio(cmap):.1%}"
@@ -47,7 +47,7 @@ def plan_b(ckpt, mc, masker):
     def run(rgb, view):
         bgr = clahe(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
         out = predict_b(model, bgr, size, mc)
-        cmap = remove_face(out["cmap"], masker(bgr))
+        cmap = remove_face(out["cmap"], masker(bgr, view))
         return cmap, out["grade_probs"], heatmap(out["uncertainty"]), f"{bald_ratio(cmap):.1%}"
 
     return run

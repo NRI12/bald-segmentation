@@ -16,13 +16,13 @@ from baldseg.face import FaceMasker, remove_face
 from baldseg.metrics import grade_report
 
 
-def classmap(model, img, conf, masker):
+def classmap(model, img, conf, masker, view):
     cmap = result_classmap(model(img, conf=conf, verbose=False)[0])
-    return remove_face(cmap, masker(img)) if masker else cmap
+    return remove_face(cmap, masker(img, view)) if masker else cmap
 
 
 def features(model, root, rows, conf, masker):
-    return np.array([grader_features(classmap(model, cv2.imread(str(root / r["file"])), conf, masker), r["view"]) for r in rows])
+    return np.array([grader_features(classmap(model, cv2.imread(str(root / r["file"])), conf, masker, r["view"]), r["view"]) for r in rows])
 
 
 def main():
