@@ -7,6 +7,7 @@ import joblib
 import numpy as np
 
 from baldseg.core import BALD, GRADES, HAIR, VIEWS, bald_ratio, clahe, grader_features, predict, stage_label
+from baldseg.face import FaceMasker, remove_face
 from baldseg.norwood_art import illustration
 
 COLORS = {HAIR: (0, 255, 0), BALD: (255, 33, 33)}
@@ -23,13 +24,14 @@ def heatmap(unc):
     return cv2.cvtColor(cv2.applyColorMap((unc * 255).astype(np.uint8), cv2.COLORMAP_INFERNO), cv2.COLOR_BGR2RGB)
 
 
-def plan_a(weights, conf):
+def plan_a(weights, conf, masker):
     from ultralytics import YOLO
     model = YOLO(weights / "best.pt")
     tree = joblib.load(weights / "grader.joblib")
 
     def run(rgb, view):
-        cmap = predict(model, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), conf)
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        cmap = remove_face(predict(model, bgr, conf), masker(clahe(bgr)))
         probs = np.zeros(len(GRADES))
         probs[tree.classes_] = tree.predict_proba([grader_features(cmap, view)])[0]
         return cmap, probs, None, f"{bald_ratio(cmap):.1%}"
@@ -37,14 +39,16 @@ def plan_a(weights, conf):
     return run
 
 
-def plan_b(ckpt, mc):
+def plan_b(ckpt, mc, masker):
     import torch
     from baldseg.multitask import load, predict as predict_b
     model, size = load(ckpt, "cuda" if torch.cuda.is_available() else "cpu")
 
     def run(rgb, view):
-        out = predict_b(model, clahe(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)), size, mc)
-        return out["cmap"], out["grade_probs"], heatmap(out["uncertainty"]), f"{bald_ratio(out['cmap']):.1%}"
+        bgr = clahe(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+        out = predict_b(model, bgr, size, mc)
+        cmap = remove_face(out["cmap"], masker(bgr))
+        return cmap, out["grade_probs"], heatmap(out["uncertainty"]), f"{bald_ratio(cmap):.1%}"
 
     return run
 
@@ -81,11 +85,13 @@ if __name__ == "__main__":
     p.add_argument("--port", type=int, default=7860)
     p.add_argument("--examples", type=Path, default=Path("examples"))
     args = p.parse_args()
+    import torch
+    masker = FaceMasker(device="cuda" if torch.cuda.is_available() else "cpu")
     plans = {}
     if args.ckpt_b.exists():
-        plans["B - SegFormer đa nhiệm"] = plan_b(args.ckpt_b, args.mc)
+        plans["B - SegFormer đa nhiệm"] = plan_b(args.ckpt_b, args.mc, masker)
     if (args.weights_a / "grader.joblib").exists():
-        plans["A - YOLO11-seg"] = plan_a(args.weights_a, args.conf)
+        plans["A - YOLO11-seg"] = plan_a(args.weights_a, args.conf, masker)
 
     with gr.Blocks(title="Đánh giá rụng tóc Hamilton-Norwood") as demo:
         gr.Markdown("# Đánh giá mức độ rụng tóc theo thang Hamilton-Norwood\nTải lên 1–5 ảnh của cùng một người, mỗi ô một góc chụp. Ảnh đỉnh đầu (Top-Down) và phía trước (Front) cho kết quả tốt nhất; kết quả là trung bình xác suất của các góc.")
@@ -99,7 +105,7 @@ if __name__ == "__main__":
                 stage = gr.Textbox(label="Mức độ (Hamilton-Norwood)", lines=2)
                 per_view = gr.Textbox(label="Theo từng góc chụp", lines=5)
             art = gr.Image(label="Minh họa stage (nhìn từ đỉnh đầu)", height=280)
-        seg = gr.Gallery(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)", columns=5, height=240)
+        seg = gr.Gallery(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ; mặt, tai, cổ đã loại khỏi phép tính)", columns=5, height=240)
         unc = gr.Gallery(label="Bản đồ bất định (Phương án B)", columns=5, height=240)
         rows, labels = examples(args.examples, plan.value)
         gr.Examples(rows, images + [plan], example_labels=labels, label="Ảnh mẫu từ tập test (mỗi dòng là một người)")

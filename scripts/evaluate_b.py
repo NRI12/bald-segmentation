@@ -8,6 +8,7 @@ import torch
 from scipy.stats import spearmanr
 
 from baldseg.core import GRADES, bald_ratio, label_classmap
+from baldseg.face import FaceMasker, remove_face
 from baldseg.metrics import SegMeter, grade_report, icc
 from baldseg.multitask import grade_items, load, predict, seg_items
 
@@ -20,15 +21,20 @@ def main():
     p.add_argument("--split", default="test")
     p.add_argument("--mc", type=int, default=8)
     p.add_argument("--out", type=Path, default=Path("results"))
+    p.add_argument("--face", action="store_true")
     args = p.parse_args()
+    masker = FaceMasker(device="cuda" if torch.cuda.is_available() else "cpu") if args.face else None
 
     model, size = load(args.weights, "cuda" if torch.cuda.is_available() else "cpu")
     meter, gt_r, mask_r, head_r, retest_r, unc, err = SegMeter(), [], [], [], [], [], []
     for it in seg_items(args.data, args.split):
         img = cv2.imread(str(it["image"]))
         gt = label_classmap(it["label"], it["names"], img.shape[:2])
+        retest_img = cv2.convertScaleAbs(cv2.flip(img, 1), alpha=1.1, beta=10)
         out = predict(model, img, size, args.mc)
-        retest = predict(model, cv2.convertScaleAbs(cv2.flip(img, 1), alpha=1.1, beta=10), size, args.mc)
+        retest = predict(model, retest_img, size, args.mc)
+        if masker:
+            out["cmap"], retest["cmap"] = remove_face(out["cmap"], masker(img)), remove_face(retest["cmap"], masker(retest_img))
         meter.update(gt, out["cmap"])
         gt_r.append(bald_ratio(gt))
         mask_r.append(bald_ratio(out["cmap"]))
@@ -59,7 +65,7 @@ def main():
         "grading_by_view": {v: float(hit[views == v].mean()) for v in sorted(set(views))},
     }
     args.out.mkdir(exist_ok=True)
-    json.dump(report, open(args.out / f"metrics_b_{args.split}.json", "w"), indent=2, default=float)
+    json.dump(report, open(args.out / f"metrics_b_{args.split}{'_face' if args.face else ''}.json", "w"), indent=2, default=float)
     print(json.dumps(report, indent=2, default=float))
 
 
