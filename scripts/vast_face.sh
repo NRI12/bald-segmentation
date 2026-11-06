@@ -14,7 +14,7 @@ if [ ! -f results/face/done ]; then
   touch results/face/done
 fi
 echo FACE_DONE
-[ -d examples ] || python -m scripts.fetch_examples
+until [ -d /workspace/src/examples ]; do sleep 10; done; sleep 30; cp -rn /workspace/src/examples .
 curl -sL -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
 chmod +x /usr/local/bin/cloudflared
 python app.py 2>&1 &
