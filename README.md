@@ -156,15 +156,16 @@ Tập phân đoạn chỉ có 2 lớp `hair`/`bald` và gần như không có �
 - loại thêm vùng da/râu phía dưới đường lông mày (hướng "xuống" = lông mày → mũi/miệng/cổ, nên không phụ thuộc chiều xoay ảnh), giới hạn trong bao lồi của các bộ phận mặt; trán và da đầu được giữ lại;
 - không dùng thẳng lớp `skin` của face-parsing vì mô hình này gán cả da đầu hói là `skin`.
 
+Phiên bản hiện tại (v3) kết hợp hai nguồn: face-parsing (cần thấy cả mắt/lông mày và mũi/miệng) và, chỉ với ảnh Left/Right, bộ dò mặt YuNet (`opencv/face_detection_yunet`, thử 4 hướng xoay) làm dự phòng. Chỉ loại da mặt dưới ngang mắt và râu dưới miệng trong vùng gần các bộ phận mặt; cổ/áo chỉ loại khi ở dưới miệng. Các bản trước: v1 cắt nhầm da đầu theo đường thẳng (gọng kính, cổ bị nhận nhầm); v2 quá thận trọng, bỏ sót mặt khi face-parsing không thấy mắt/mũi.
+
 Ảnh hưởng (test):
 
-| | Không lọc mặt | Có lọc mặt |
-|---|---|---|
-| A: Dice bald (phân đoạn, 46 ảnh) | 0.742 | 0.745 |
-| B: Dice bald / MAE R (46 ảnh) | 0.815 / 0.066 | 0.817 / 0.066 |
-| A: cây 6 stage, accuracy / ±1 / kappa (190 ảnh) | 0.289 / 0.668 / 0.568 | 0.247 / 0.742 / 0.622 |
+| | Không lọc | v1 | v2 | v3 |
+|---|---|---|---|---|
+| B: Dice bald / MAE R (46 ảnh) | 0.815 / 0.066 | 0.817 / 0.066 | 0.815 / 0.065 | 0.818 / 0.065 |
+| A: cây 6 stage, accuracy / ±1 / kappa (190 ảnh) | 0.289 / 0.668 / 0.568 | 0.247 / 0.742 / 0.622 | 0.321 / 0.721 / 0.590 | 0.300 / 0.705 / 0.597 |
 
-Ảnh test của tập phân đoạn chủ yếu là đỉnh đầu nên Dice gần như không đổi; tác dụng chính là R ở ảnh mặt/nghiêng không còn bị tính cả khuôn mặt. Đầu phân mức của B không dùng mask nên stage của B không đổi. Hạn chế: ở ảnh sau đầu, phần gáy/cổ sát chân tóc đôi khi vẫn bị tính là `bald` vì face-parsing không nhận ra cổ từ phía sau.
+Test diện rộng trên demo (20 người test, gộp 5 góc): 13/20 đúng stage, 19/20 lệch ≤1 stage. Hạn chế còn lại của lọc mặt: ảnh Front khi người cúi đầu (không bộ dò nào thấy mặt), dải gáy/cổ ở ảnh Back, đôi chỗ má còn sót ở ảnh nghiêng. Sửa triệt để cần thêm lớp "da không phải da đầu" vào tập huấn luyện và train lại mô hình phân đoạn. Đầu phân mức của B không dùng mask nên stage của B không phụ thuộc bước lọc này. Lỗi phân đoạn khác quan sát được: tóc thưa lan tỏa vẫn bị tính là tóc (mô hình chỉ có 2 lớp), đường ngôi bị tính là hói (R tăng 2–5%), đôi khi vật ngoài đầu bị nhận là tóc.
 
 ## Ghi chú phương pháp
 
