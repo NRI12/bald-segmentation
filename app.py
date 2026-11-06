@@ -19,10 +19,8 @@ def overlay(rgb, cmap):
     return np.where(cmap[..., None] > 0, (0.55 * rgb + 0.45 * color).astype(np.uint8), rgb)
 
 
-def stage_outputs(level, cmap, view, probs):
-    label, vertex = stage_label(level, cmap, view)
-    detail = " | ".join(f"{g}: {p:.0%}" for g, p in zip(GRADES, probs))
-    return f"Norwood {label}\n{detail}", illustration(level + 2, vertex)
+def heatmap(unc):
+    return cv2.cvtColor(cv2.applyColorMap((unc * 255).astype(np.uint8), cv2.COLORMAP_INFERNO), cv2.COLOR_BGR2RGB)
 
 
 def plan_a(weights, conf):
@@ -34,7 +32,7 @@ def plan_a(weights, conf):
         cmap = predict(model, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), conf)
         probs = np.zeros(len(GRADES))
         probs[tree.classes_] = tree.predict_proba([grader_features(cmap, view)])[0]
-        return overlay(rgb, cmap), None, f"{bald_ratio(cmap):.1%}", *stage_outputs(int(probs.argmax()), cmap, view, probs)
+        return cmap, probs, None, f"{bald_ratio(cmap):.1%}"
 
     return run
 
@@ -46,11 +44,32 @@ def plan_b(ckpt, mc):
 
     def run(rgb, view):
         out = predict_b(model, clahe(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)), size, mc)
-        heat = cv2.cvtColor(cv2.applyColorMap((out["uncertainty"] * 255).astype(np.uint8), cv2.COLORMAP_INFERNO), cv2.COLOR_BGR2RGB)
-        r = f"{bald_ratio(out['cmap']):.1%} (head {out['ratio_head']:.1%} ± {out['ratio_std']:.1%})"
-        return overlay(rgb, out["cmap"]), heat, r, *stage_outputs(int(out["grade_probs"].argmax()), out["cmap"], view, out["grade_probs"])
+        return out["cmap"], out["grade_probs"], heatmap(out["uncertainty"]), f"{bald_ratio(out['cmap']):.1%}"
 
     return run
+
+
+def assess(plans, plan, images):
+    shots = [(view, img) for view, img in zip(VIEWS, images) if img is not None]
+    if not shots:
+        raise gr.Error("Hãy tải lên ít nhất một ảnh.")
+    results = [(view, img, *plans[plan](img, view)) for view, img in shots]
+    probs = np.mean([r[3] for r in results], axis=0)
+    level = int(probs.argmax())
+    top = next((r for r in results if r[0] == "Top-Down"), None)
+    label, vertex = stage_label(level, top[2], "Top-Down") if top else (GRADES[level], False)
+    per_view = "\n".join(f"{view}: R = {ratio}, {GRADES[int(p.argmax())]} ({p.max():.0%})" for view, _, _, p, _, ratio in results)
+    detail = " | ".join(f"{g}: {p:.0%}" for g, p in zip(GRADES, probs))
+    seg = [(overlay(img, cmap), view) for view, img, cmap, _, _, _ in results]
+    unc = [(u, view) for view, _, _, _, u, _ in results if u is not None]
+    return seg, unc, f"Norwood {label}  (gộp {len(results)} góc chụp)\n{detail}", per_view, illustration(level + 2, vertex)
+
+
+def examples(root, plan):
+    dirs = sorted(p for p in root.iterdir() if p.is_dir())
+    rows = [[next((str(f) for f in d.glob(f"{v}.jpg")), None) for v in VIEWS] + [plan] for d in dirs]
+    labels = [f"Nhãn Norwood {d.name[7]} (người {d.name.split('_')[1]})" if d.name.startswith("norwood") else f"Tập phân đoạn ({d.name})" for d in dirs]
+    return rows, labels
 
 
 if __name__ == "__main__":
@@ -67,10 +86,22 @@ if __name__ == "__main__":
         plans["B - SegFormer đa nhiệm"] = plan_b(args.ckpt_b, args.mc)
     if (args.weights_a / "grader.joblib").exists():
         plans["A - YOLO11-seg"] = plan_a(args.weights_a, args.conf)
-    gr.Interface(
-        lambda rgb, view, plan: plans[plan](rgb, view),
-        [gr.Image(type="numpy", label="Ảnh đầu"), gr.Dropdown(VIEWS, value="Top-Down", label="Góc chụp"), gr.Radio(list(plans), value=next(iter(plans)), label="Mô hình")],
-        [gr.Image(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)"), gr.Image(label="Bản đồ bất định (Phương án B)"), gr.Textbox(label="Tỷ lệ rụng tóc R"), gr.Textbox(label="Mức độ (Hamilton-Norwood)", lines=2), gr.Image(label="Minh họa stage (nhìn từ đỉnh đầu)")],
-        examples=[[str(f), f.stem.split("_")[-1], next(iter(plans))] for f in sorted(args.examples.glob("*.jpg"))],
-        title="Đánh giá mức độ rụng tóc",
-    ).launch(server_name="0.0.0.0", server_port=args.port)
+
+    with gr.Blocks(title="Đánh giá rụng tóc Hamilton-Norwood") as demo:
+        gr.Markdown("# Đánh giá mức độ rụng tóc theo thang Hamilton-Norwood\nTải lên 1–5 ảnh của cùng một người, mỗi ô một góc chụp. Ảnh đỉnh đầu (Top-Down) và phía trước (Front) cho kết quả tốt nhất; kết quả là trung bình xác suất của các góc.")
+        with gr.Row():
+            images = [gr.Image(type="numpy", label=v, height=180) for v in VIEWS]
+        with gr.Row():
+            plan = gr.Radio(list(plans), value=next(iter(plans)), label="Mô hình")
+            button = gr.Button("Đánh giá", variant="primary")
+        with gr.Row():
+            with gr.Column(scale=2):
+                stage = gr.Textbox(label="Mức độ (Hamilton-Norwood)", lines=2)
+                per_view = gr.Textbox(label="Theo từng góc chụp", lines=5)
+            art = gr.Image(label="Minh họa stage (nhìn từ đỉnh đầu)", height=280)
+        seg = gr.Gallery(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)", columns=5, height=240)
+        unc = gr.Gallery(label="Bản đồ bất định (Phương án B)", columns=5, height=240)
+        rows, labels = examples(args.examples, plan.value)
+        gr.Examples(rows, images + [plan], example_labels=labels, label="Ảnh mẫu từ tập test (mỗi dòng là một người)")
+        button.click(lambda pl, *imgs: assess(plans, pl, imgs), [plan] + images, [seg, unc, stage, per_view, art])
+    demo.launch(server_name="0.0.0.0", server_port=args.port)

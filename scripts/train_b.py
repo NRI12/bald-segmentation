@@ -27,6 +27,31 @@ def validate(model, loader, device):
     return dice, kappa
 
 
+def fit(model, train_items, size, epochs, batch, lr, workers, device, on_epoch):
+    loader = DataLoader(Samples(train_items, size, True), batch, shuffle=True, num_workers=workers, drop_last=True)
+    counts = np.bincount([it["grade"] for it in train_items if "grade" in it], minlength=len(GRADES))
+    grade_weight = torch.tensor(counts.sum() / (len(GRADES) * np.maximum(counts, 1)), dtype=torch.float32, device=device)
+    heads = [p for n, p in model.named_parameters() if not n.startswith("seg.segformer")]
+    encoder = [p for n, p in model.named_parameters() if n.startswith("seg.segformer")]
+    opt = torch.optim.AdamW([{"params": encoder, "lr": lr}, {"params": heads, "lr": lr * 10}], weight_decay=0.01)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=[lr, lr * 10], total_steps=epochs * len(loader), pct_start=0.1)
+    scaler = torch.amp.GradScaler(enabled=device == "cuda")
+    for epoch in range(epochs):
+        model.train()
+        total = 0.0
+        for b in loader:
+            b = [t.to(device) for t in b]
+            with torch.autocast(device, enabled=device == "cuda"):
+                loss = total_loss(model(b[0]), b, grade_weight)
+            opt.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
+            sched.step()
+            total += loss.item()
+        on_epoch(epoch, total / len(loader))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data", default="data/data.yaml")
@@ -44,40 +69,18 @@ def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     train_items = seg_items(args.data, "train") + grade_items(args.grades, "train", args.pseudo)
-    valid_items = seg_items(args.data, "valid") + grade_items(args.grades, "valid")
-    train = DataLoader(Samples(train_items, args.size, True), args.batch, shuffle=True, num_workers=args.workers, drop_last=True)
-    valid = DataLoader(Samples(valid_items, args.size, False), args.batch, num_workers=args.workers)
-
-    counts = np.bincount([it["grade"] for it in train_items if "grade" in it], minlength=len(GRADES))
-    grade_weight = torch.tensor(counts.sum() / (len(GRADES) * np.maximum(counts, 1)), dtype=torch.float32, device=device)
-
+    valid = DataLoader(Samples(seg_items(args.data, "valid") + grade_items(args.grades, "valid"), args.size, False), args.batch, num_workers=args.workers)
     model = load(args.init, device)[0] if args.init else MultiTask(args.backbone).to(device)
-    heads = [p for n, p in model.named_parameters() if not n.startswith("seg.segformer")]
-    encoder = [p for n, p in model.named_parameters() if n.startswith("seg.segformer")]
-    opt = torch.optim.AdamW([{"params": encoder, "lr": args.lr}, {"params": heads, "lr": args.lr * 10}], weight_decay=0.01)
-    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=[args.lr, args.lr * 10], total_steps=args.epochs * len(train), pct_start=0.1)
-    scaler = torch.amp.GradScaler(enabled=device == "cuda")
+    best = [-1.0]
 
-    best = -1.0
-    for epoch in range(args.epochs):
-        model.train()
-        total = 0.0
-        for batch in train:
-            batch = [t.to(device) for t in batch]
-            with torch.autocast(device, enabled=device == "cuda"):
-                loss = total_loss(model(batch[0]), batch, grade_weight)
-            opt.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(opt)
-            scaler.update()
-            sched.step()
-            total += loss.item()
+    def on_epoch(epoch, loss):
         dice, kappa = validate(model, valid, device)
-        score = dice + kappa
-        if score > best:
-            best = score
+        if dice + kappa > best[0]:
+            best[0] = dice + kappa
             save(model, args.out, args.size)
-        print(f"epoch {epoch + 1}/{args.epochs} loss {total / len(train):.4f} dice {dice:.4f} kappa {kappa:.4f} best {best:.4f}", flush=True)
+        print(f"epoch {epoch + 1}/{args.epochs} loss {loss:.4f} dice {dice:.4f} kappa {kappa:.4f} best {best[0]:.4f}", flush=True)
+
+    fit(model, train_items, args.size, args.epochs, args.batch, args.lr, args.workers, device, on_epoch)
 
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ def grade_items(grade_dir, split, pseudo_dir=None):
     for r in csv.DictReader(open(Path(grade_dir) / "labels.csv")):
         if r["split"] == split:
             png = pseudo_dir and Path(pseudo_dir) / f"{Path(r['file']).stem}.png"
-            items.append({"image": Path(grade_dir) / r["file"], "mask": png if png and png.exists() else None, "grade": NORWOOD_TO_GRADE[int(r["norwood"])], "view": r["view"]})
+            items.append({"image": Path(grade_dir) / r["file"], "mask": png if png and png.exists() else None, "grade": NORWOOD_TO_GRADE[int(r["norwood"])], "view": r["view"], "subject": r["subject"]})
     return items
 
 
