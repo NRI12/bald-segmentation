@@ -19,6 +19,8 @@ Phân đoạn vùng tóc / da đầu lộ, tính tỷ lệ rụng tóc `R = S_ba
 | `scripts/pseudo_label.py` | Sinh pseudo-mask cho ảnh Norwood theo ngưỡng độ tin cậy |
 | `scripts/evaluate_b.py` | Đánh giá Phương án B: phân đoạn, R, bất định, phân mức theo nhãn Norwood |
 | `scripts/vast_launch.sh` | Đóng gói mã nguồn vào onstart và tạo instance Vast.ai |
+| `scripts/vast_norwood.sh` | Fine-tune 6 stage Norwood trên Vast rồi chạy demo |
+| `baldseg/norwood_art.py` | Vẽ hình minh họa từng stage (nhìn từ đỉnh đầu) |
 | `scripts/vast_onstart.sh` | Pipeline chạy trên instance: chuẩn bị dữ liệu, train, đánh giá |
 | `app.py` | Demo Gradio: chọn mô hình A/B, ảnh → overlay mask, R, mức độ, bản đồ bất định |
 | `examples/` | Ảnh mẫu từ tập test: `seg*` (hairloss-segmentation, MIT), `norwood*` (uze/hair-loss-nq8hh, CC BY 4.0) |
@@ -114,12 +116,26 @@ Ma trận nhầm lẫn mức của B (test, hàng = thật):
 
 Lỗi chủ yếu nằm giữa hai mức liền kề (đúng tính thứ bậc, kappa 0.71). Bản đồ bất định tương quan mạnh với lỗi phân đoạn (Spearman 0.89), dùng được để cảnh báo ca khó. Pseudo-label: giữ 844/908 ảnh Norwood ở vòng 2.
 
+## Phân loại theo thang Hamilton-Norwood (6 stage, phiên bản hiện tại)
+
+Đầu ra mức độ dùng trực tiếp thang Norwood: Stage 1-2, 3, 4, 5, 6, 7 (tập nhãn không có Stage 1 nên gộp với 2). Stage 3 Vertex là cờ phụ theo luật: ảnh Top-Down, dự đoán Stage 3 và có vùng hói ở đỉnh được tóc bao quanh. B fine-tune 15 epoch từ `stage2.pt` với đầu phân mức 6 lớp, loss CE có trọng số + kỳ vọng thứ bậc (SmoothL1); A fit lại cây quyết định 6 lớp. Demo hiển thị stage, xác suất từng stage và hình minh họa (`baldseg/norwood_art.py`).
+
+| Test (190 ảnh Norwood) | A: YOLO + cây | B: SegFormer đa nhiệm |
+|---|---|---|
+| Accuracy đúng stage | 0.289 | **0.489** |
+| Accuracy ±1 stage | 0.668 | **0.858** |
+| MAE (stage) | 1.16 | **0.71** |
+| F1 macro | 0.270 | **0.481** |
+| Kappa (quadratic) | 0.568 | **0.784** |
+
+Valid của B: accuracy 0.346, ±1 stage 0.883, kappa 0.745. Phân đoạn của B sau fine-tune giữ nguyên: Dice bald test 0.815, valid 0.877; MAE của R 0.066.
+
 ## Ghi chú phương pháp
 
 - Dataset: Roboflow `fifa-eg5yw/hairloss-segmentation-lf62l` version 1, 461 ảnh gốc, lớp `bald`, `hair`, resize 640×640, không augment sẵn. Augment xoay/lật thực hiện lúc train nên không rò rỉ giữa các split.
 - Mask lớp: chồng `bald` lên `hair` (nhãn); với dự đoán, instance có độ tin cậy cao hơn ghi đè.
 - Mức độ: không có nhãn mức, nên mức tham chiếu suy từ R của nhãn gốc; ngưỡng là các phân vị 25/50/75 của R trên tập train (`--grade-method kmeans` cho phân cụm 1D).
 - F1 pixel trùng Dice. ICC test–retest đo trên ảnh gốc và ảnh lật ngang + đổi sáng.
-- Nhãn mức thật lấy từ `uze/hair-loss-nq8hh` (CC BY 4.0, 5 góc chụp/người): Norwood 2 → 0, 3 → 1, 4–5 → 2, 6–7 → 3. Chia split theo người để không rò rỉ.
+- Nhãn mức thật lấy từ `uze/hair-loss-nq8hh` (CC BY 4.0, 5 góc chụp/người): Phiên bản 4 mức trước đó: Norwood 2 → 0, 3 → 1, 4–5 → 2, 6–7 → 3; hiện tại dùng 6 stage (xem mục trên). Chia split theo người để không rò rỉ.
 - Phương án B: loss `L = L_seg (CE có trọng số biên + Dice) + 1.0·SmoothL1(R) + 0.5·CE(mức, trọng số lớp) + 0.2·nhất quán(R head, R mềm từ mask)`. Vòng 1 học trên mask thật + nhãn mức; vòng 2 thêm pseudo-mask (pixel conf ≥ 0.9, ảnh giữ lại nếu ≥ 60% pixel đủ tin cậy). Bất định: 8 lượt MC Dropout × lật ngang, entropy chuẩn hóa.
 - Chưa làm: pretrain trên CelebAMask-HQ / Figaro-1k và CRF (thay bằng morphology + lọc thành phần liên thông nhỏ).
