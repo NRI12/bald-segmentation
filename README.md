@@ -1,6 +1,6 @@
 # Bald segmentation (ảnh đỉnh đầu)
 
-Đánh giá mức độ rụng tóc kiểu nam theo thang Hamilton-Norwood từ **một ảnh chụp từ trên xuống đỉnh đầu**: phân đoạn tóc / da đầu lộ bằng SegFormer-B2, tính tỷ lệ da đầu lộ `R = S_bald / (S_bald + S_hair)`, so với ngưỡng R đo trên hình nhìn từ trên xuống của thang Hamilton-Norwood để ra mức.
+Đánh giá mức độ rụng tóc kiểu nam theo thang Hamilton-Norwood từ **một ảnh chụp từ trên xuống đỉnh đầu**: phân đoạn tóc / da đầu lộ bằng SegFormer-B2 hoặc YOLO11m-seg (để so sánh), tính tỷ lệ da đầu lộ `R = S_bald / (S_bald + S_hair)`, so với ngưỡng R đo trên hình nhìn từ trên xuống của thang Hamilton-Norwood để ra mức.
 
 ## Cấu trúc
 
@@ -9,16 +9,18 @@
 | `baldseg/core.py` | CLAHE, polygon → class map, tính R |
 | `baldseg/data.py` | Tải Roboflow, lọc trùng (dHash), chia split theo nhóm |
 | `baldseg/model.py` | SegFormer 3 lớp (nền, tóc, hói): dataset, loss (CE có trọng số biên + Dice), dự đoán (TTA lật ngang + morphology) |
+| `baldseg/yolo.py` | YOLO11-seg: instance mask → class map (instance tin cậy hơn ghi đè) |
 | `baldseg/chart.py` | Đọc ngưỡng, R → mức |
 | `baldseg/norwood_art.py` | Hình minh họa mức nhìn từ đỉnh đầu |
 | `baldseg/metrics.py` | Dice/IoU/Precision/Recall; Accuracy, ±1, MAE, F1, kappa, confusion matrix |
 | `scripts/prepare_data.py` | Tập phân đoạn `fifa-eg5yw/hairloss-segmentation-lf62l` → `data/` (80/10/10) |
 | `scripts/prepare_topdown.py` | Ảnh Top-Down của `uze/hair-loss-nq8hh` (nhãn Norwood 2–7) → `data_topdown/`, chia theo người |
 | `scripts/chart_thresholds.py` | Đo R trên ảnh bảng Hamilton-Norwood → `weights/norwood_thresholds.json` |
-| `scripts/train.py` | Huấn luyện SegFormer-B2 → `weights/segformer.pt` |
-| `scripts/evaluate.py` | Phân đoạn trên tập test/valid, phân mức trên ảnh Top-Down có nhãn → `results/metrics.json` |
+| `scripts/train_segformer.py` | Huấn luyện SegFormer-B2 → `weights/segformer.pt` |
+| `scripts/train_yolo.py` | Fine-tune YOLO11m-seg (COCO) → `weights/yolo.pt` |
+| `scripts/evaluate.py` | So sánh hai mô hình: phân đoạn trên tập test/valid, phân mức trên ảnh Top-Down có nhãn → `results/metrics.json` |
 | `scripts/fetch_examples.py` | Ảnh mẫu đỉnh đầu từ tập test → `examples/` |
-| `app.py` | Demo Gradio |
+| `app.py` | Demo Gradio, chọn SegFormer hoặc YOLO |
 | `scripts/vast_launch.sh`, `scripts/vast_run.sh` | Chạy toàn bộ trên Vast.ai: chuẩn bị dữ liệu, train, đánh giá, đóng gói, demo |
 
 ## Chạy
@@ -28,7 +30,8 @@ pip install -r requirements.txt
 export ROBOFLOW_API_KEY=<key>
 python -m scripts.prepare_data
 python -m scripts.prepare_topdown
-python -m scripts.train
+python -m scripts.train_segformer
+python -m scripts.train_yolo
 python -m scripts.evaluate
 python -m scripts.fetch_examples
 python app.py

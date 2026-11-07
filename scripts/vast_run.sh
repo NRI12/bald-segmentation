@@ -5,7 +5,8 @@ pip install --retries 10 --timeout 60 -r requirements.txt
 if [ ! -f /workspace/bald-segmentation-topdown.tgz ]; then
   python -m scripts.prepare_data
   python -m scripts.prepare_topdown
-  python -m scripts.train
+  python -m scripts.train_segformer
+  python -m scripts.train_yolo
   python -m scripts.evaluate
   python -m scripts.fetch_examples
   rm -rf raw_examples
