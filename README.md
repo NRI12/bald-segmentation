@@ -56,6 +56,13 @@ R đo trên hình nhìn từ trên xuống của từng mức trong bảng, ch�
 
 Khi đánh giá với nhãn 6 mức của tập Norwood (1–2, 3, 4, 5, 6, 7): Stage 1 → 1–2, khoảng 2–3 tách tại R = 18%, 3 Vertex → 3.
 
-## Kết quả
+## Kết quả (RTX 3090; SegFormer-B2 60 epoch, YOLO11m-seg 150 epoch)
 
-Xem `results/metrics.json`. Hạn chế đã biết: ảnh đỉnh đầu ít thấy vành tóc hai bên/sau nên R ở mức nặng thường cao hơn hình vẽ khoảng một mức; tóc thưa lan tỏa vẫn bị tính là tóc; đường ngôi có thể bị tính là hói; trán nằm ngoài khung làm Stage 3 dễ ra Stage 1.
+| | SegFormer-B2 | YOLO11m-seg |
+|---|---|---|
+| Dice / IoU vùng hói, test phân đoạn (46 ảnh) | **0.810 / 0.680** | 0.772 / 0.629 |
+| MAE của R, test phân đoạn | **0.079** | 0.092 |
+| Phân mức, 253 ảnh Top-Down: đúng stage / ±1 / kappa | **0.510 / 0.953 / 0.897** | 0.415 / 0.842 / 0.829 |
+| Phân mức, 40 ảnh Top-Down test: đúng stage / ±1 / kappa | 0.325 / 0.925 / 0.819 | 0.325 / 0.900 / 0.827 |
+
+Chi tiết (theo lớp, confusion matrix, R trung vị theo nhãn) trong `results/metrics.json`. Hạn chế đã biết: ảnh đỉnh đầu ít thấy vành tóc hai bên/sau nên R ở mức nặng thường cao hơn hình vẽ khoảng một mức; tóc thưa lan tỏa vẫn bị tính là tóc; đường ngôi có thể bị tính là hói; trán nằm ngoài khung làm Stage 3 dễ ra Stage 1.
