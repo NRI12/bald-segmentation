@@ -169,7 +169,7 @@ Test diện rộng trên demo (20 người test, gộp 5 góc): 13/20 đúng sta
 
 ## Phân mức từ ảnh đỉnh đầu theo ngưỡng của thang Hamilton-Norwood (phiên bản demo hiện tại)
 
-Demo chỉ nhận **một ảnh chụp từ trên xuống đỉnh đầu**. `scripts/chart_thresholds.py <ảnh bảng Hamilton-Norwood>` đo tỷ lệ da đầu lộ R = trắng / (trắng + tóc) trên hình nhìn từ trên xuống của 8 mức trong bảng (chỉ vùng sọ: từ đỉnh tới mép dưới tai, bỏ tai và mặt), lấy ngưỡng là trung điểm giữa các mức liền kề, lưu `weights/norwood_thresholds.json` và bản đồ nhãn của từng hình vào `weights/chart/` (app tô màu và hiển thị làm hình tham chiếu). Ảnh bảng gốc không lưu trong repo.
+Demo chỉ nhận **một ảnh chụp từ trên xuống đỉnh đầu**. `scripts/chart_thresholds.py <ảnh bảng Hamilton-Norwood>` đo tỷ lệ da đầu lộ R = trắng / (trắng + tóc) trên hình nhìn từ trên xuống của 8 mức trong bảng (chỉ vùng sọ: từ đỉnh tới mép dưới tai, bỏ tai và mặt), lấy ngưỡng là trung điểm giữa các mức liền kề, lưu vào `weights/norwood_thresholds.json`. Ô hình mẫu trên demo là hình minh họa vẽ bằng code (`baldseg/norwood_art.py`) theo mức dự đoán. Ảnh bảng gốc không lưu trong repo.
 
 | Mức | 1 | 2–3 | 3 Vertex | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|---|---|---|
