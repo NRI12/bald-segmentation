@@ -167,26 +167,6 @@ Phiên bản hiện tại (v3) kết hợp hai nguồn: face-parsing (cần th�
 
 Test diện rộng trên demo (20 người test, gộp 5 góc): 13/20 đúng stage, 19/20 lệch ≤1 stage. Hạn chế còn lại của lọc mặt: ảnh Front khi người cúi đầu (không bộ dò nào thấy mặt), dải gáy/cổ ở ảnh Back, đôi chỗ má còn sót ở ảnh nghiêng. Sửa triệt để cần thêm lớp "da không phải da đầu" vào tập huấn luyện và train lại mô hình phân đoạn. Đầu phân mức của B không dùng mask nên stage của B không phụ thuộc bước lọc này. Lỗi phân đoạn khác quan sát được: tóc thưa lan tỏa vẫn bị tính là tóc (mô hình chỉ có 2 lớp), đường ngôi bị tính là hói (R tăng 2–5%), đôi khi vật ngoài đầu bị nhận là tóc.
 
-## Phân mức từ ảnh đỉnh đầu theo ngưỡng của thang Hamilton-Norwood (phiên bản demo hiện tại)
-
-Demo chỉ nhận **một ảnh chụp từ trên xuống đỉnh đầu**. `scripts/chart_thresholds.py <ảnh bảng Hamilton-Norwood>` đo tỷ lệ da đầu lộ R = trắng / (trắng + tóc) trên hình nhìn từ trên xuống của 8 mức trong bảng (chỉ vùng sọ: từ đỉnh tới mép dưới tai, bỏ tai và mặt), lấy ngưỡng là trung điểm giữa các mức liền kề, lưu vào `weights/norwood_thresholds.json`. Ô hình mẫu trên demo là hình minh họa vẽ bằng code (`baldseg/norwood_art.py`) theo mức dự đoán. Ảnh bảng gốc không lưu trong repo.
-
-| Mức | 1 | 2–3 | 3 Vertex | 4 | 5 | 6 | 7 |
-|---|---|---|---|---|---|---|---|
-| R trên bảng | 10% | 15–21% | 28% | 40% | 50% | 76% | 90% |
-| Khoảng R | < 14% | 14–23% | 23–34% | 34–45% | 45–63% | 63–83% | ≥ 83% |
-
-Stage 2 và 3 có R gần nhau (Stage 3 lõm sâu ở giữa nhưng ít hói ở thái dương) nên gộp một khoảng. Ảnh mới: phân đoạn (A hoặc B) → R → so ngưỡng → mức.
-
-Đánh giá trên 253 ảnh Top-Down có nhãn Norwood (`scripts/evaluate_top.py`):
-
-| Phân đoạn | Đúng stage | ±1 stage | MAE | Kappa |
-|---|---|---|---|---|
-| A (YOLO) | 0.395 | 0.806 | 0.85 | 0.820 |
-| B (SegFormer) | 0.466 | 0.953 | 0.60 | 0.895 |
-
-R trung vị trên ảnh thật (B) theo nhãn: Stage 1–2: 1.7%, 3: 14.8%, 4: 38.7%, 5: 72.3%, 6: 90.5%, 7: 100%. Ở mức nặng ảnh thật có R cao hơn hình vẽ khoảng một mức (5 → 6, 6 → 7) vì ảnh đỉnh đầu ít thấy vành tóc hai bên/sau; khi trán không được phân đoạn (ngoài khung hoặc bị coi là mặt) thì Stage 3 có thể ra Stage 1.
-
 ## Ghi chú phương pháp
 
 - Dataset: Roboflow `fifa-eg5yw/hairloss-segmentation-lf62l` version 1, 461 ảnh gốc, lớp `bald`, `hair`, resize 640×640, không augment sẵn. Augment xoay/lật thực hiện lúc train nên không rò rỉ giữa các split.
