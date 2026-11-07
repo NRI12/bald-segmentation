@@ -26,6 +26,8 @@ def stage_masks(stage, size=256):
 
 
 def illustration(stage, size=320):
+    if "-" in stage:
+        return np.hstack([cv2.resize(illustration(s, size), (size // 2, size // 2)) for s in stage.split("-")])
     head, bald = stage_masks(stage, size)
     img = np.full((size, size, 3), 255, np.uint8)
     img[head] = HAIR
