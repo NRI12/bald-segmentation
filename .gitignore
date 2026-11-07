@@ -1,11 +1,11 @@
 data/
+data_topdown/
 raw/
+raw_norwood/
+raw_examples/
 runs/
 results/
 weights/*.pt
 *.zip
 __pycache__/
 .env
-data_grade/
-raw_grade/
-raw_examples/

@@ -1,7 +1,5 @@
-ultralytics>=8.3
 roboflow>=1.1
 gradio>=4.0
 scikit-learn
-scipy
 opencv-python-headless
 transformers

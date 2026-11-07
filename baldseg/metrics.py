@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.stats import spearmanr
 from sklearn.metrics import accuracy_score, cohen_kappa_score, confusion_matrix, precision_recall_fscore_support
 
 from baldseg.core import CLASS_IDS
@@ -39,21 +38,3 @@ def grade_report(gt, pred, levels):
         "kappa_quadratic": cohen_kappa_score(gt, pred, labels=range(levels), weights="quadratic"),
         "confusion_matrix": confusion_matrix(gt, pred, labels=range(levels)).tolist(),
     }
-
-
-def ratio_report(gt_r, pred_r, gt_grades, retest_r):
-    gt_r, pred_r = np.asarray(gt_r), np.asarray(pred_r)
-    return {
-        "mae": float(np.abs(gt_r - pred_r).mean()),
-        "spearman_vs_grade": float(spearmanr(pred_r, gt_grades).statistic),
-        "icc_test_retest": icc(pred_r, np.asarray(retest_r)),
-    }
-
-
-def icc(a, b):
-    x = np.stack([a, b], 1)
-    n, k = x.shape
-    m = x.mean()
-    msr = k * ((x.mean(1) - m) ** 2).sum() / (n - 1)
-    mse = ((x - x.mean(1, keepdims=True) - x.mean(0) + m) ** 2).sum() / ((n - 1) * (k - 1))
-    return float((msr - mse) / (msr + (k - 1) * mse))
