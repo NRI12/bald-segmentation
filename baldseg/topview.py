@@ -31,7 +31,8 @@ def aligned(cmap, hull, quarter):
 
 
 def agreement(norm, head, bald):
-    pred, ref = (norm == BALD)[head], bald[head]
+    known = head & (norm > 0)
+    pred, ref = (norm == BALD)[known], bald[known]
     iou = lambda a, b: (a & b).sum() / max((a | b).sum(), 1)
     return float((iou(pred, ref) + iou(~pred, ~ref)) / 2)
 
