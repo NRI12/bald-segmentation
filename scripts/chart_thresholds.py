@@ -19,8 +19,14 @@ def chart_ratio(gray, x, y, cut):
     row = np.nonzero(head[top + int(0.25 * height)])[0]
     yy, xx = np.mgrid[: crop.shape[0], : crop.shape[1]]
     skull = cv2.erode(head, np.ones((5, 5), np.uint8)).astype(bool) & (yy < top + cut * height) & (xx > row.min() + 3) & (xx < row.max() - 3)
-    hair, bald = (skull & (crop < 110)).sum(), (skull & (crop > 200)).sum()
-    return float(bald / (bald + hair))
+    hair, bald = skull & (crop < 110), skull & (crop > 200)
+    ratio = float(bald.sum() / (bald.sum() + hair.sum()))
+    labels = np.zeros(crop.shape, np.uint8)
+    labels[head.astype(bool)] = 1
+    labels[hair] = 2
+    labels[bald] = 3
+    labels[(crop < 150) & ~skull] = 4
+    return ratio, labels
 
 
 def main():
@@ -31,7 +37,11 @@ def main():
     args = p.parse_args()
 
     gray = cv2.cvtColor(cv2.imread(str(args.chart)), cv2.COLOR_BGR2GRAY)
-    ratios = {s: chart_ratio(gray, x, y, args.cut) for s, (x, y) in BOXES.items()}
+    measured = {s: chart_ratio(gray, x, y, args.cut) for s, (x, y) in BOXES.items()}
+    ratios = {s: r for s, (r, _) in measured.items()}
+    (args.out.parent / "chart").mkdir(parents=True, exist_ok=True)
+    for s, (_, labels) in measured.items():
+        cv2.imwrite(str(args.out.parent / "chart" / f"{s}.png"), labels, [cv2.IMWRITE_PNG_COMPRESSION, 9])
     levels = {**{s: ratios[s] for s in ratios if s not in ("2", "3")}, "2-3": (ratios["2"] + ratios["3"]) / 2}
     values = [levels[s] for s in ORDER]
     thresholds = [(a + b) / 2 for a, b in zip(values, values[1:])]

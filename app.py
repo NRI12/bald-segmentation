@@ -7,7 +7,6 @@ import numpy as np
 
 from baldseg import chart
 from baldseg.core import BALD, HAIR, bald_ratio, clahe, predict
-from baldseg.norwood_art import illustration
 
 COLORS = {HAIR: (0, 255, 0), BALD: (255, 33, 33)}
 
@@ -49,7 +48,7 @@ def assess(plans, cfg, plan, rgb):
         raise gr.Error("Không tìm thấy vùng tóc/da đầu trong ảnh.")
     ratio = bald_ratio(cmap)
     stage = chart.stage(ratio, cfg)
-    return overlay(rgb, cmap), f"{ratio:.1%}", f"Norwood {name(stage)}", table(cfg, stage), illustration(stage)
+    return overlay(rgb, cmap), f"{ratio:.1%}", f"Norwood {name(stage)}", table(cfg, stage), chart.reference(stage, cfg)
 
 
 if __name__ == "__main__":
@@ -76,7 +75,7 @@ if __name__ == "__main__":
         with gr.Row():
             image = gr.Image(type="numpy", label="Ảnh đỉnh đầu (Top-Down)", height=320)
             seg = gr.Image(label="Phân đoạn (xanh: tóc, đỏ: da đầu lộ)", height=320)
-            art = gr.Image(label="Hình mẫu của mức", height=320)
+            art = gr.Image(label="Hình mức tương ứng trong thang Hamilton-Norwood (xanh: tóc, đỏ: da đầu lộ, xám: ngoài vùng đo)", height=320)
         with gr.Row():
             with gr.Column():
                 plan = gr.Radio(list(plans), value=next(iter(plans)), label="Mô hình phân đoạn")
